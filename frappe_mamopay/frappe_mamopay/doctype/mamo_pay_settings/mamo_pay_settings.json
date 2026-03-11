@@ -1,0 +1,118 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-03-10 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "is_sandbox",
+  "section_api",
+  "api_key",
+  "column_break_api",
+  "base_url",
+  "section_webhook",
+  "webhook_secret",
+  "section_defaults",
+  "default_currency",
+  "column_break_defaults",
+  "return_url",
+  "failure_return_url"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_sandbox",
+   "fieldtype": "Check",
+   "label": "Sandbox Mode"
+  },
+  {
+   "fieldname": "section_api",
+   "fieldtype": "Section Break",
+   "label": "API Configuration"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_api",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_webhook",
+   "fieldtype": "Section Break",
+   "label": "Webhook Configuration"
+  },
+  {
+   "description": "Set this value as the auth_header when creating a webhook in Mamo Pay. Used to verify incoming webhook requests.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  },
+  {
+   "fieldname": "section_defaults",
+   "fieldtype": "Section Break",
+   "label": "Defaults"
+  },
+  {
+   "default": "AED",
+   "fieldname": "default_currency",
+   "fieldtype": "Select",
+   "label": "Default Currency",
+   "options": "AED\nUSD\nEUR\nGBP\nSAR"
+  },
+  {
+   "fieldname": "column_break_defaults",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "URL to redirect customer after successful payment",
+   "fieldname": "return_url",
+   "fieldtype": "Data",
+   "label": "Success Return URL"
+  },
+  {
+   "description": "URL to redirect customer after failed payment",
+   "fieldname": "failure_return_url",
+   "fieldtype": "Data",
+   "label": "Failure Return URL"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Frappe Mamopay",
+ "name": "Mamo Pay Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

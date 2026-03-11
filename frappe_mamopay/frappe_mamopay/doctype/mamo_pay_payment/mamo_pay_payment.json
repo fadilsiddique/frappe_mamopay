@@ -1,0 +1,197 @@
+{
+ "actions": [],
+ "autoname": "MAMO-.#####",
+ "creation": "2026-03-10 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_payment",
+  "title",
+  "status",
+  "payment_link_id",
+  "payment_url",
+  "column_break_payment",
+  "amount",
+  "amount_currency",
+  "description",
+  "section_transaction",
+  "transaction_id",
+  "external_id",
+  "column_break_transaction",
+  "reference_doctype",
+  "reference_name",
+  "section_customer",
+  "customer_name",
+  "column_break_customer",
+  "customer_email",
+  "section_meta",
+  "integration_request",
+  "column_break_meta",
+  "mamo_response"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_payment",
+   "fieldtype": "Section Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "default": "Created",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Created\nCaptured\nFailed\nRefunded\nRefund Initiated\nAuthorized",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_link_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Payment Link ID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "payment_url",
+   "fieldtype": "Data",
+   "label": "Payment URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_payment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "default": "AED",
+   "fieldname": "amount_currency",
+   "fieldtype": "Select",
+   "label": "Currency",
+   "options": "AED\nUSD\nEUR\nGBP\nSAR"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_transaction",
+   "fieldtype": "Section Break",
+   "label": "Transaction Details"
+  },
+  {
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "label": "Transaction ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External ID"
+  },
+  {
+   "fieldname": "column_break_transaction",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference DocType",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "section_customer",
+   "fieldtype": "Section Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "column_break_customer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "label": "Customer Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_meta",
+   "fieldtype": "Section Break",
+   "label": "Metadata",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "integration_request",
+   "fieldtype": "Link",
+   "label": "Integration Request",
+   "options": "Integration Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mamo_response",
+   "fieldtype": "Code",
+   "label": "Mamo Pay Response",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-03-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Frappe Mamopay",
+ "name": "Mamo Pay Payment",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}
