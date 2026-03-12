@@ -38,7 +38,10 @@ class MamoPayClient:
 				json=data if method in ("POST", "PATCH") else None,
 				timeout=30,
 			)
-			response_data = response.json()
+			try:
+				response_data = response.json()
+			except (ValueError, Exception):
+				response_data = {"success": response.ok}
 
 			if integration_request:
 				if response.ok:
@@ -47,7 +50,12 @@ class MamoPayClient:
 					integration_request.update_status(response_data, "Failed")
 
 			if not response.ok:
-				error_msg = response_data.get("message") or response_data.get("messages") or response.text
+				error_msg = (
+					response_data.get("errors")
+					or response_data.get("message")
+					or response_data.get("messages")
+					or response.text
+				)
 				frappe.throw(f"Mamo Pay API error ({response.status_code}): {error_msg}")
 
 			return response_data
@@ -69,9 +77,9 @@ class MamoPayClient:
 		"""Get charge details. GET /charges/{chargeId}"""
 		return self._request("GET", f"charges/{charge_id}")
 
-	def create_refund(self, charge_id):
+	def create_refund(self, charge_id, amount):
 		"""Initiate a refund. POST /charges/{chargeId}/refunds"""
-		return self._request("POST", f"charges/{charge_id}/refunds")
+		return self._request("POST", f"charges/{charge_id}/refunds", data={"amount": amount})
 
 	def create_webhook(self, url, enabled_events, auth_header=None):
 		"""Register a webhook. POST /webhooks"""
@@ -86,3 +94,17 @@ class MamoPayClient:
 	def list_webhooks(self):
 		"""List all webhooks. GET /webhooks"""
 		return self._request("GET", "webhooks")
+
+	def update_webhook(self, webhook_id, url, enabled_events, auth_header=None):
+		"""Update a webhook. PATCH /webhooks/{webhookId}"""
+		data = {
+			"url": url,
+			"enabled_events": enabled_events,
+		}
+		if auth_header:
+			data["auth_header"] = auth_header
+		return self._request("PATCH", f"webhooks/{webhook_id}", data=data)
+
+	def delete_webhook(self, webhook_id):
+		"""Delete a webhook. DELETE /webhooks/{webhookId}"""
+		return self._request("DELETE", f"webhooks/{webhook_id}")
