@@ -4,11 +4,11 @@ authors = [
     { name = "Upscape Technologies", email = "info@upscapetech.com"}
 ]
 description = "Mamo Pay Integration for frappe framework"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    # "frappe~=16.0.0" # Installed and managed by bench.
+    # "frappe~=15.0.0" # Installed and managed by bench.
 ]
 
 [build-system]
