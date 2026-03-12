@@ -26,7 +26,7 @@ bench --site your-site.localhost migrate
 ### Requirements
 
 - Python >= 3.14
-- Frappe Framework >= v15
+- Frappe Framework >= v16
 
 ## Configuration
 

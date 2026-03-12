@@ -240,6 +240,186 @@ The final refund status (`Refunded` or `Captured` if refund fails) is updated vi
 
 ---
 
+## 5. Register Webhook
+
+Registers a new webhook with Mamo Pay to receive event notifications.
+
+**Endpoint:** `POST /api/method/frappe_mamopay.api.register_webhook`
+
+**Auth:** Bearer token (OAuth)
+
+### Request Body
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | Yes | The webhook URL that will receive notifications |
+| `enabled_events` | array | Yes | List of event types to subscribe to (see available events below) |
+| `auth_header` | string | No | Authentication header value (1-50 chars). Set this same value as Webhook Secret in Mamo Pay Settings |
+
+### Available Events
+
+| Event | Description |
+|---|---|
+| `charge.succeeded` | Payment captured successfully |
+| `charge.failed` | Payment failed |
+| `charge.authorized` | Payment authorized (not yet captured) |
+| `charge.refund_initiated` | Refund process started |
+| `charge.refunded` | Refund completed |
+| `charge.refund_failed` | Refund failed |
+| `charge.card_verified` | Card verification completed |
+| `subscription.succeeded` | Subscription payment succeeded |
+| `subscription.failed` | Subscription payment failed |
+| `payment_link.create` | Payment link created |
+| `payout.processed` | Payout processed |
+| `payout.failed` | Payout failed |
+| `expense.create` | Expense created |
+| `expense.update` | Expense updated |
+| `card_transaction.create` | Card transaction created |
+| `card_transaction.update` | Card transaction updated |
+
+### Example Request
+
+```bash
+curl -X POST https://your-site.com/api/method/frappe_mamopay.api.register_webhook \
+  -H "Authorization: Bearer YOUR_OAUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    "enabled_events": ["charge.succeeded", "charge.failed", "charge.refunded", "charge.refund_initiated", "charge.refund_failed"],
+    "auth_header": "your-webhook-secret"
+  }'
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": {
+    "id": "MB-WH-D8B07FB8D7",
+    "url": "https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    "enabled_events": ["charge.succeeded", "charge.failed"],
+    "auth_header": "your-webhook-secret"
+  }
+}
+```
+
+---
+
+## 6. List Webhooks
+
+Lists all webhooks registered with Mamo Pay.
+
+**Endpoint:** `POST /api/method/frappe_mamopay.api.list_webhooks`
+
+**Auth:** Bearer token (OAuth)
+
+### Example Request
+
+```bash
+curl -X POST https://your-site.com/api/method/frappe_mamopay.api.list_webhooks \
+  -H "Authorization: Bearer YOUR_OAUTH_TOKEN"
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": [
+    {
+      "id": "MB-WH-D8B07FB8D7",
+      "url": "https://your-site.com/api/method/frappe_mamopay.api.webhook",
+      "enabled_events": ["charge.succeeded", "charge.failed"],
+      "auth_header": "your-webhook-secret"
+    }
+  ]
+}
+```
+
+---
+
+## 7. Update Webhook
+
+Updates an existing webhook's URL, events, or auth header.
+
+**Endpoint:** `POST /api/method/frappe_mamopay.api.update_webhook`
+
+**Auth:** Bearer token (OAuth)
+
+### Request Body
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `webhook_id` | string | Yes | Mamo Pay webhook ID (e.g. `MB-WH-D8B07FB8D7`) |
+| `url` | string | Yes | Updated webhook URL |
+| `enabled_events` | array | Yes | Updated list of event types |
+| `auth_header` | string | No | Updated authentication header (1-50 chars) |
+
+### Example Request
+
+```bash
+curl -X POST https://your-site.com/api/method/frappe_mamopay.api.update_webhook \
+  -H "Authorization: Bearer YOUR_OAUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "webhook_id": "MB-WH-D8B07FB8D7",
+    "url": "https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    "enabled_events": ["charge.succeeded", "charge.failed", "charge.refunded"],
+    "auth_header": "new-secret"
+  }'
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": {
+    "id": "MB-WH-D8B07FB8D7",
+    "url": "https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    "enabled_events": ["charge.succeeded", "charge.failed", "charge.refunded"],
+    "auth_header": "new-secret"
+  }
+}
+```
+
+---
+
+## 8. Delete Webhook
+
+Deletes a registered webhook from Mamo Pay.
+
+**Endpoint:** `POST /api/method/frappe_mamopay.api.delete_webhook`
+
+**Auth:** Bearer token (OAuth)
+
+### Request Body
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `webhook_id` | string | Yes | Mamo Pay webhook ID to delete |
+
+### Example Request
+
+```bash
+curl -X POST https://your-site.com/api/method/frappe_mamopay.api.delete_webhook \
+  -H "Authorization: Bearer YOUR_OAUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "webhook_id": "MB-WH-D8B07FB8D7"
+  }'
+```
+
+### Success Response (200)
+
+```json
+{
+  "message": {
+    "success": true
+  }
+}
+```
+
+---
+
 ## Integration Flow (Next.js Example)
 
 ```
