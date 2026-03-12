@@ -9,10 +9,20 @@ Create payment links, process payments, handle webhooks, and manage refunds — 
 - **Payment Links** — Create Mamo Pay payment links via API and track them as Frappe documents
 - **Server-Side Verification** — Verify payment status directly with Mamo Pay API (never trust client-side redirects)
 - **Webhook Handler** — Receive and process real-time payment notifications from Mamo Pay
-- **Refunds** — Initiate refunds for captured payments
+- **Webhook Management** — Register, list, update, and delete webhooks via API or Frappe desk UI
+- **Refunds** — Initiate full refunds for captured payments
 - **Reference Document Hooks** — Automatically trigger `on_payment_authorized()` on linked documents (e.g., Sales Order, Custom DocType)
 - **Sandbox Support** — Toggle between sandbox and production environments
 - **Integration Request Logging** — All API calls are logged in Frappe's Integration Request for debugging
+
+## Security
+
+- **Role-based access** — All payment and webhook management endpoints require `Mamo Pay Payment` write permission (System Manager by default)
+- **Webhook authentication** — Incoming webhooks are validated against a mandatory shared secret via `Authorization` header
+- **Input validation** — Amount, email, return URLs, and custom_data are validated before processing
+- **Server-side verification** — Payment status is always verified directly with Mamo Pay API, never trusted from client-side redirects
+- **XSS protection** — All user-controlled values are escaped in UI rendering
+- **Error logging** — API errors are logged server-side for debugging without leaking internal details
 
 ## Installation
 
@@ -38,7 +48,7 @@ bench --site your-site.localhost migrate
 | **Enabled** | Check to activate the integration |
 | **Sandbox Mode** | Check to use Mamo Pay sandbox environment (for testing) |
 | **API Key** | Your Mamo Pay API key (from [Mamo Pay Business Dashboard](https://business.mamopay.com)) |
-| **Webhook Secret** | Shared secret for verifying incoming webhooks |
+| **Webhook Secret** | **Required.** Shared secret for verifying incoming webhooks. Must match the `auth_header` used when registering webhooks with Mamo Pay |
 | **Default Currency** | Fallback currency — `AED`, `USD`, `EUR`, `GBP`, or `SAR` |
 | **Success Return URL** | Where customers are redirected after successful payment |
 | **Failure Return URL** | Where customers are redirected after failed payment |
@@ -102,6 +112,34 @@ result = frappe.call(
 )
 ```
 
+### Managing Webhooks
+
+You can manage webhooks from the **Mamo Pay Settings** form (Webhooks button group) or via API:
+
+```python
+# Register
+frappe.call(
+    "frappe_mamopay.api.register_webhook",
+    url="https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    enabled_events=["charge.succeeded", "charge.failed", "charge.refunded"],
+    auth_header="your-webhook-secret",
+)
+
+# List
+frappe.call("frappe_mamopay.api.list_webhooks")
+
+# Update
+frappe.call(
+    "frappe_mamopay.api.update_webhook",
+    webhook_id="MB-WH-D8B07FB8D7",
+    url="https://your-site.com/api/method/frappe_mamopay.api.webhook",
+    enabled_events=["charge.succeeded", "charge.failed"],
+)
+
+# Delete
+frappe.call("frappe_mamopay.api.delete_webhook", webhook_id="MB-WH-D8B07FB8D7")
+```
+
 ### Handling Payment Status in Your DocType
 
 Implement `on_payment_authorized` on any document linked via `reference_doctype` / `reference_name`:
@@ -118,14 +156,28 @@ class SalesOrder(Document):
 
 ## Webhook Setup
 
-1. Set a **Webhook Secret** in Mamo Pay Settings
-2. Register the webhook URL with Mamo Pay:
+1. Set a **Webhook Secret** in Mamo Pay Settings (this is **mandatory** — webhooks without a configured secret will be rejected)
+2. Register the webhook using the **Register Webhook** button in Mamo Pay Settings, or via API:
    ```
-   POST https://your-site.com/api/method/frappe_mamopay.api.webhook
+   URL: https://your-site.com/api/method/frappe_mamopay.api.webhook
+   Auth Header: <same value as your Webhook Secret>
    ```
-3. Mamo Pay will send events for: `charge.succeeded`, `charge.failed`, `charge.refunded`, `charge.refund_initiated`, `charge.refund_failed`, `charge.authorized`
+3. Select the events you want to receive (e.g., `charge.succeeded`, `charge.failed`, `charge.refunded`)
 
-The webhook handler validates the `Authorization` header against your configured secret.
+> **Note:** Webhook registration requires a publicly accessible URL. For local development, use a tunnel like [ngrok](https://ngrok.com) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/).
+
+### Supported Webhook Events
+
+| Event | Payment Status |
+|---|---|
+| `charge.succeeded` | Captured |
+| `charge.failed` | Failed |
+| `charge.authorized` | Authorized |
+| `charge.refunded` | Refunded |
+| `charge.refund_initiated` | Refund Initiated |
+| `charge.refund_failed` | Captured (reverted) |
+
+The webhook handler validates the `Authorization` header against your configured Webhook Secret.
 
 ## Payment Lifecycle
 
@@ -135,6 +187,30 @@ Created  -->  Authorized  -->  Captured  -->  Refund Initiated  -->  Refunded
                   v                v
                Failed        Refund Failed (reverts to Captured)
 ```
+
+## Input Validation
+
+| Field | Validation |
+|---|---|
+| `amount` | Must be a positive number |
+| `customer_email` | Must be a valid email format |
+| `return_url` / `failure_return_url` | Must start with `https://` or `http://` |
+| `custom_data` | Must be a valid JSON object, max 10 KB |
+
+## Permissions
+
+All API endpoints (except the webhook receiver) require write permission on `Mamo Pay Payment`. By default, only the **System Manager** role has this permission. To grant access to other roles, add permissions on the `Mamo Pay Payment` DocType.
+
+| Endpoint | Permission Required |
+|---|---|
+| `create_payment_link` | Mamo Pay Payment (write) |
+| `verify_payment` | Logged-in user |
+| `refund_payment` | Mamo Pay Payment (write) |
+| `register_webhook` | Mamo Pay Payment (write) |
+| `list_webhooks` | Mamo Pay Payment (write) |
+| `update_webhook` | Mamo Pay Payment (write) |
+| `delete_webhook` | Mamo Pay Payment (write) |
+| `webhook` | Guest (validated by secret) |
 
 ## DocTypes
 

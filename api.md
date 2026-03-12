@@ -2,7 +2,7 @@
 
 Base URL: `https://your-site.com`
 
-All authenticated endpoints require a Frappe OAuth Bearer token in the `Authorization` header.
+All authenticated endpoints require a Frappe session (cookie-based) or OAuth Bearer token in the `Authorization` header. Additionally, endpoints marked with **Role: System Manager** require the user to have write permission on `Mamo Pay Payment`.
 
 ---
 
@@ -12,23 +12,24 @@ Creates a Mamo Pay payment link and returns the URL to redirect the customer.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.create_payment_link`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
 
 ### Request Body
 
-| Parameter | Type | Required | Description |
+| Parameter | Type | Required | Validation |
 |---|---|---|---|
-| `title` | string | Yes | Payment link title (1-50 chars) |
-| `amount` | number | Yes | Payment amount (min 2) |
-| `amount_currency` | string | No | Currency code. Options: `AED`, `USD`, `EUR`, `GBP`, `SAR`. Defaults to value in Mamo Pay Settings |
-| `description` | string | No | Payment description shown at checkout (max 75 chars) |
+| `title` | string | Yes | 1-50 chars |
+| `amount` | number | Yes | Must be > 0 |
+| `amount_currency` | string | No | `AED`, `USD`, `EUR`, `GBP`, `SAR`. Defaults to Mamo Pay Settings value |
+| `description` | string | No | Max 75 chars |
 | `reference_doctype` | string | No | Frappe DocType to link this payment to (e.g. `Sales Order`) |
 | `reference_name` | string | No | Document name of the reference DocType |
-| `customer_email` | string | No | Customer email (pre-fills checkout) |
-| `customer_name` | string | No | Customer full name (auto-split into first/last name) |
-| `return_url` | string | No | Redirect URL after successful payment. Defaults to value in Mamo Pay Settings |
-| `failure_return_url` | string | No | Redirect URL after failed payment. Defaults to value in Mamo Pay Settings |
-| `custom_data` | object | No | Key-value pairs for custom metadata |
+| `customer_email` | string | No | Must be a valid email format |
+| `customer_name` | string | No | Auto-split into first/last name for Mamo Pay |
+| `return_url` | string | No | Must start with `https://` or `http://`. Defaults to Mamo Pay Settings value |
+| `failure_return_url` | string | No | Must start with `https://` or `http://`. Defaults to Mamo Pay Settings value |
+| `custom_data` | object | No | JSON object, max 10 KB |
 
 ### Example Request
 
@@ -61,6 +62,13 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.create_payment_
 }
 ```
 
+### Errors
+
+| Code | Reason |
+|---|---|
+| `403` | User does not have `Mamo Pay Payment` write permission |
+| `417` | Mamo Pay is not enabled, invalid amount, invalid email, or invalid URL |
+
 ### After Payment Redirect
 
 After the customer completes payment, Mamo Pay redirects to your `return_url` with query parameters:
@@ -84,7 +92,8 @@ Verifies payment status server-side with Mamo Pay API. **Call this after the cus
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.verify_payment`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** Any logged-in user
 
 ### Request Body
 
@@ -138,12 +147,12 @@ Receives webhook notifications from Mamo Pay. This endpoint is called by Mamo Pa
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.webhook`
 
-**Auth:** None (guest access). Validated via `Authorization` header matching the webhook secret configured in Mamo Pay Settings.
+**Auth:** Guest access. Validated via `Authorization` header matching the **Webhook Secret** configured in Mamo Pay Settings. **A webhook secret must be configured** — requests are rejected if no secret is set.
 
 ### Setup
 
-1. Set a **Webhook Secret** in Mamo Pay Settings (Frappe desk)
-2. Register this webhook URL with Mamo Pay using their API or dashboard, with the same secret as the `auth_header`
+1. Set a **Webhook Secret** in Mamo Pay Settings (Frappe desk) — this is **mandatory**
+2. Register this webhook URL with Mamo Pay (via the Register Webhook button in Settings or the API below), using the same secret as the `auth_header`
 
 ### Supported Events
 
@@ -181,6 +190,20 @@ Receives webhook notifications from Mamo Pay. This endpoint is called by Mamo Pa
 }
 ```
 
+### Errors
+
+| Code | Reason |
+|---|---|
+| `401` | Missing or invalid `Authorization` header, or webhook secret not configured |
+| `417` | Invalid JSON payload or payload too large (max 1 MB) |
+
+### Security Notes
+
+- Webhook secret is **mandatory** — if not configured, all webhooks are rejected and an error is logged
+- The `Authorization` header is compared using `hmac.compare_digest()` to prevent timing attacks
+- Maximum payload size is 1 MB
+- Unmatched webhooks log only identifiers (not full payload with customer data)
+
 ### Reference Document Hook
 
 When a payment status changes via webhook, the system calls `on_payment_authorized(status)` on the linked reference document (if `reference_doctype` and `reference_name` were set during payment creation). Implement this method on your DocType to handle business logic:
@@ -197,11 +220,12 @@ class SalesOrder(Document):
 
 ## 4. Refund Payment
 
-Initiates a refund for a captured payment.
+Initiates a full refund for a captured payment.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.refund_payment`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
 
 ### Request Body
 
@@ -233,8 +257,10 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.refund_payment 
 
 ### Errors
 
-- `400` — Payment status is not `Captured`
-- `400` — Transaction ID not found on the payment record
+| Code | Reason |
+|---|---|
+| `403` | User does not have `Mamo Pay Payment` write permission |
+| `417` | Payment status is not `Captured`, or Transaction ID not found |
 
 The final refund status (`Refunded` or `Captured` if refund fails) is updated via webhook.
 
@@ -246,7 +272,10 @@ Registers a new webhook with Mamo Pay to receive event notifications.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.register_webhook`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
+
+> **Note:** Mamo Pay validates the webhook URL during registration — it must be publicly accessible. For local development, use a tunnel like ngrok.
 
 ### Request Body
 
@@ -303,6 +332,13 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.register_webhoo
 }
 ```
 
+### Errors
+
+| Code | Reason |
+|---|---|
+| `403` | User does not have `Mamo Pay Payment` write permission |
+| `422` | Webhook URL is unreachable (Mamo Pay validates the URL) |
+
 ---
 
 ## 6. List Webhooks
@@ -311,7 +347,8 @@ Lists all webhooks registered with Mamo Pay.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.list_webhooks`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
 
 ### Example Request
 
@@ -343,7 +380,8 @@ Updates an existing webhook's URL, events, or auth header.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.update_webhook`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
 
 ### Request Body
 
@@ -389,7 +427,8 @@ Deletes a registered webhook from Mamo Pay.
 
 **Endpoint:** `POST /api/method/frappe_mamopay.api.delete_webhook`
 
-**Auth:** Bearer token (OAuth)
+**Auth:** Bearer token (OAuth) or session cookie
+**Role:** System Manager (or any role with `Mamo Pay Payment` write permission)
 
 ### Request Body
 
@@ -420,7 +459,7 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.delete_webhook 
 
 ---
 
-## Integration Flow (Next.js Example)
+## Integration Flow
 
 ```
 1. Frontend                              Frappe                              Mamo Pay
@@ -442,9 +481,25 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.delete_webhook 
    |<-- {status: "Captured"} --------------|                                   |
    |                                       |                                   |
    |                                       |<-- webhook (charge.succeeded) ----|
+   |                                       |-- validate Authorization header   |
    |                                       |-- update status + call hook       |
    |                                       |-- return 200 -------------------->|
 ```
+
+---
+
+## Permissions Summary
+
+| Endpoint | Access Level |
+|---|---|
+| `create_payment_link` | Authenticated + `Mamo Pay Payment` write |
+| `verify_payment` | Authenticated (any logged-in user) |
+| `refund_payment` | Authenticated + `Mamo Pay Payment` write |
+| `register_webhook` | Authenticated + `Mamo Pay Payment` write |
+| `list_webhooks` | Authenticated + `Mamo Pay Payment` write |
+| `update_webhook` | Authenticated + `Mamo Pay Payment` write |
+| `delete_webhook` | Authenticated + `Mamo Pay Payment` write |
+| `webhook` | Guest (validated by mandatory webhook secret) |
 
 ---
 
@@ -452,15 +507,15 @@ curl -X POST https://your-site.com/api/method/frappe_mamopay.api.delete_webhook 
 
 Before using the API, configure **Mamo Pay Settings** in Frappe desk:
 
-| Setting | Description |
-|---|---|
-| Enabled | Must be checked to use the API |
-| Sandbox Mode | Use Mamo Pay sandbox environment for testing |
-| API Key | Your Mamo Pay API key (Bearer token) |
-| Webhook Secret | Shared secret for webhook verification |
-| Default Currency | Fallback currency (AED, USD, EUR, GBP, SAR) |
-| Success Return URL | Default redirect URL after successful payment |
-| Failure Return URL | Default redirect URL after failed payment |
+| Setting | Required | Description |
+|---|---|---|
+| Enabled | Yes | Must be checked to use the API |
+| Sandbox Mode | No | Use Mamo Pay sandbox environment for testing |
+| API Key | Yes | Your Mamo Pay API key (Bearer token) |
+| Webhook Secret | Yes | Shared secret for webhook verification. Webhooks are rejected without this |
+| Default Currency | No | Fallback currency (AED, USD, EUR, GBP, SAR) |
+| Success Return URL | No | Default redirect URL after successful payment |
+| Failure Return URL | No | Default redirect URL after failed payment |
 
 ### Test Cards (Sandbox)
 
