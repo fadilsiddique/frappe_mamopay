@@ -4,6 +4,15 @@ import json
 import frappe
 from frappe_mamopay.mamopay_client import MamoPayClient
 
+# Maximum custom_data payload size (bytes)
+MAX_CUSTOM_DATA_SIZE = 10240  # 10 KB
+
+
+def _check_mamopay_role():
+	"""Ensure current user has System Manager role for Mamo Pay operations."""
+	if not frappe.has_permission("Mamo Pay Payment", ptype="write"):
+		frappe.throw("Insufficient permissions for Mamo Pay operations.", frappe.PermissionError)
+
 
 @frappe.whitelist()
 def create_payment_link(
@@ -20,11 +29,29 @@ def create_payment_link(
 	custom_data=None,
 ):
 	"""Create a Mamo Pay payment link and log it as a Mamo Pay Payment record."""
+	_check_mamopay_role()
+
 	settings = frappe.get_single("Mamo Pay Settings")
 	if not settings.enabled:
 		frappe.throw("Mamo Pay is not enabled.")
 
-	amount = float(amount)
+	# Validate amount
+	try:
+		amount = float(amount)
+	except (ValueError, TypeError):
+		frappe.throw("Invalid amount value.")
+
+	if amount <= 0:
+		frappe.throw("Amount must be greater than zero.")
+
+	# Validate email if provided
+	if customer_email:
+		frappe.utils.validate_email_address(customer_email, throw=True)
+
+	# Validate return URLs — only allow http/https
+	for url_val in [return_url, failure_return_url]:
+		if url_val and not url_val.startswith(("https://", "http://")):
+			frappe.throw("Return URL must start with https:// or http://")
 
 	# Build params for Mamo Pay API
 	params = {
@@ -51,7 +78,14 @@ def create_payment_link(
 
 	if custom_data:
 		if isinstance(custom_data, str):
-			custom_data = json.loads(custom_data)
+			if len(custom_data) > MAX_CUSTOM_DATA_SIZE:
+				frappe.throw("custom_data exceeds maximum allowed size.")
+			try:
+				custom_data = json.loads(custom_data)
+			except (json.JSONDecodeError, TypeError):
+				frappe.throw("custom_data must be valid JSON.")
+		if not isinstance(custom_data, dict):
+			frappe.throw("custom_data must be a JSON object.")
 		params["custom_data"] = custom_data
 
 	# Call Mamo Pay API
@@ -98,8 +132,11 @@ def verify_payment(payment_link_id, transaction_id=None):
 	if transaction_id:
 		try:
 			charge_data = client.get_charge(transaction_id)
-		except Exception:
-			pass
+		except Exception as e:
+			frappe.log_error(
+				title=f"Mamo Pay: Failed to fetch charge {transaction_id}",
+				message=str(e),
+			)
 
 	# Determine status from charge data or link data
 	if charge_data:
@@ -137,18 +174,28 @@ def verify_payment(payment_link_id, transaction_id=None):
 @frappe.whitelist(allow_guest=True, xss_safe=True, methods=["POST"])
 def webhook():
 	"""Receive webhook notifications from Mamo Pay."""
-	# Validate webhook secret
 	settings = frappe.get_single("Mamo Pay Settings")
 	webhook_secret = settings.get_webhook_secret()
 
-	if webhook_secret:
-		auth_header = frappe.request.headers.get("Authorization", "")
-		if not hmac.compare_digest(auth_header, webhook_secret):
-			frappe.throw("Unauthorized", frappe.AuthenticationError)
+	# Always require webhook secret in production
+	if not webhook_secret:
+		frappe.log_error(
+			title="Mamo Pay: Webhook secret not configured",
+			message="Webhook received but no secret is configured. Rejecting request.",
+		)
+		frappe.throw("Webhook secret not configured.", frappe.AuthenticationError)
 
-	# Parse payload
+	auth_header = frappe.request.headers.get("Authorization", "")
+	if not auth_header or not hmac.compare_digest(auth_header, webhook_secret):
+		frappe.throw("Unauthorized", frappe.AuthenticationError)
+
+	# Parse payload with size check
+	raw_data = frappe.request.data
+	if len(raw_data) > 1048576:  # 1 MB max
+		frappe.throw("Payload too large")
+
 	try:
-		payload = json.loads(frappe.request.data)
+		payload = json.loads(raw_data)
 	except (json.JSONDecodeError, TypeError):
 		frappe.throw("Invalid JSON payload")
 
@@ -169,10 +216,10 @@ def webhook():
 		payment_doc = frappe.get_doc("Mamo Pay Payment", payment)
 		payment_doc.update_from_webhook(event_type, charge_data)
 	else:
-		# Log unmatched webhook for manual review
+		# Log only identifiers, not full payload with customer data
 		frappe.log_error(
 			title="Mamo Pay: Unmatched webhook",
-			message=json.dumps(payload, indent=2),
+			message=f"event_type={event_type}, payment_link_id={payment_link_id}, external_id={external_id}",
 		)
 
 	# Always return 200 to acknowledge receipt
@@ -198,6 +245,7 @@ def _parse_events(enabled_events):
 @frappe.whitelist()
 def register_webhook(url, enabled_events, auth_header=None):
 	"""Register a webhook with Mamo Pay."""
+	_check_mamopay_role()
 	enabled_events = _parse_events(enabled_events)
 
 	client = MamoPayClient()
@@ -207,6 +255,7 @@ def register_webhook(url, enabled_events, auth_header=None):
 @frappe.whitelist()
 def list_webhooks():
 	"""List all registered webhooks from Mamo Pay."""
+	_check_mamopay_role()
 	client = MamoPayClient()
 	return client.list_webhooks()
 
@@ -214,6 +263,7 @@ def list_webhooks():
 @frappe.whitelist()
 def update_webhook(webhook_id, url, enabled_events, auth_header=None):
 	"""Update an existing webhook in Mamo Pay."""
+	_check_mamopay_role()
 	enabled_events = _parse_events(enabled_events)
 
 	client = MamoPayClient()
@@ -223,6 +273,7 @@ def update_webhook(webhook_id, url, enabled_events, auth_header=None):
 @frappe.whitelist()
 def delete_webhook(webhook_id):
 	"""Delete a webhook from Mamo Pay."""
+	_check_mamopay_role()
 	client = MamoPayClient()
 	return client.delete_webhook(webhook_id)
 
@@ -230,6 +281,7 @@ def delete_webhook(webhook_id):
 @frappe.whitelist()
 def refund_payment(payment_name):
 	"""Initiate a refund for a captured payment."""
+	_check_mamopay_role()
 	payment = frappe.get_doc("Mamo Pay Payment", payment_name)
 
 	if payment.status != "Captured":

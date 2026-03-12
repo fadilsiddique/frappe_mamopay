@@ -53,16 +53,16 @@ function load_webhooks(frm) {
 function show_webhooks_dialog(frm, webhooks) {
 	let rows = webhooks
 		.map(
-			(wh) => `
+			(wh, idx) => `
 		<tr>
-			<td><code style="font-size: 11px;">${wh.id}</code></td>
-			<td style="max-width: 250px; word-break: break-all;">${wh.url}</td>
-			<td style="font-size: 12px;">${(wh.enabled_events || []).join(", ")}</td>
+			<td><code style="font-size: 11px;">${frappe.utils.escape_html(wh.id)}</code></td>
+			<td style="max-width: 250px; word-break: break-all;">${frappe.utils.escape_html(wh.url)}</td>
+			<td style="font-size: 12px;">${(wh.enabled_events || []).map(e => frappe.utils.escape_html(e)).join(", ")}</td>
 			<td>
-				<button class="btn btn-xs btn-default btn-edit-wh" data-id="${wh.id}" data-url="${wh.url}" data-events='${JSON.stringify(wh.enabled_events || [])}' data-auth="${wh.auth_header || ""}">
+				<button class="btn btn-xs btn-default btn-edit-wh" data-idx="${idx}">
 					${__("Edit")}
 				</button>
-				<button class="btn btn-xs btn-danger btn-delete-wh" data-id="${wh.id}">
+				<button class="btn btn-xs btn-danger btn-delete-wh" data-idx="${idx}">
 					${__("Delete")}
 				</button>
 			</td>
@@ -92,11 +92,11 @@ function show_webhooks_dialog(frm, webhooks) {
 	});
 
 	d.$wrapper.on("click", ".btn-delete-wh", function () {
-		let webhook_id = $(this).data("id");
-		frappe.confirm(__("Delete webhook {0}?", [webhook_id]), () => {
+		let wh = webhooks[$(this).data("idx")];
+		frappe.confirm(__("Delete webhook {0}?", [wh.id]), () => {
 			frappe.call({
 				method: "frappe_mamopay.api.delete_webhook",
-				args: { webhook_id },
+				args: { webhook_id: wh.id },
 				freeze: true,
 				callback() {
 					frappe.show_alert({ message: __("Webhook deleted"), indicator: "green" });
@@ -108,14 +108,9 @@ function show_webhooks_dialog(frm, webhooks) {
 	});
 
 	d.$wrapper.on("click", ".btn-edit-wh", function () {
-		let btn = $(this);
+		let wh = webhooks[$(this).data("idx")];
 		d.hide();
-		edit_webhook_dialog(frm, {
-			id: btn.data("id"),
-			url: btn.data("url"),
-			enabled_events: btn.data("events"),
-			auth_header: btn.data("auth"),
-		});
+		edit_webhook_dialog(frm, wh);
 	});
 
 	d.show();

@@ -50,13 +50,19 @@ class MamoPayClient:
 					integration_request.update_status(response_data, "Failed")
 
 			if not response.ok:
-				error_msg = (
+				error_detail = (
 					response_data.get("errors")
 					or response_data.get("message")
 					or response_data.get("messages")
 					or response.text
 				)
-				frappe.throw(f"Mamo Pay API error ({response.status_code}): {error_msg}")
+				# Log full error details server-side for debugging
+				frappe.log_error(
+					title=f"Mamo Pay API error ({response.status_code})",
+					message=f"URL: {url}\nResponse: {error_detail}",
+				)
+				# Show a safe message to the user
+				frappe.throw(f"Mamo Pay API error ({response.status_code}): {error_detail}")
 
 			return response_data
 
