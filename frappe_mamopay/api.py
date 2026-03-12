@@ -179,6 +179,54 @@ def webhook():
 	return {"status": "ok"}
 
 
+def _parse_events(enabled_events):
+	"""Parse enabled_events from various input formats into a list."""
+	if isinstance(enabled_events, list):
+		return enabled_events
+	if isinstance(enabled_events, str):
+		# Try JSON array first, then comma-separated
+		try:
+			parsed = json.loads(enabled_events)
+			if isinstance(parsed, list):
+				return parsed
+		except (json.JSONDecodeError, TypeError):
+			pass
+		return [e.strip() for e in enabled_events.split(",") if e.strip()]
+	return []
+
+
+@frappe.whitelist()
+def register_webhook(url, enabled_events, auth_header=None):
+	"""Register a webhook with Mamo Pay."""
+	enabled_events = _parse_events(enabled_events)
+
+	client = MamoPayClient()
+	return client.create_webhook(url, enabled_events, auth_header=auth_header)
+
+
+@frappe.whitelist()
+def list_webhooks():
+	"""List all registered webhooks from Mamo Pay."""
+	client = MamoPayClient()
+	return client.list_webhooks()
+
+
+@frappe.whitelist()
+def update_webhook(webhook_id, url, enabled_events, auth_header=None):
+	"""Update an existing webhook in Mamo Pay."""
+	enabled_events = _parse_events(enabled_events)
+
+	client = MamoPayClient()
+	return client.update_webhook(webhook_id, url, enabled_events, auth_header=auth_header)
+
+
+@frappe.whitelist()
+def delete_webhook(webhook_id):
+	"""Delete a webhook from Mamo Pay."""
+	client = MamoPayClient()
+	return client.delete_webhook(webhook_id)
+
+
 @frappe.whitelist()
 def refund_payment(payment_name):
 	"""Initiate a refund for a captured payment."""
@@ -191,7 +239,7 @@ def refund_payment(payment_name):
 		frappe.throw("Transaction ID not found. Cannot process refund.")
 
 	client = MamoPayClient()
-	response = client.create_refund(payment.transaction_id)
+	response = client.create_refund(payment.transaction_id, payment.amount)
 
 	payment.status = "Refund Initiated"
 	payment.mamo_response = json.dumps(response, indent=2)
