@@ -100,33 +100,39 @@ class MamoPayPayment(Document):
 
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
-		pe = get_payment_entry("Sales Order", so.name)
+		# Run as Administrator since get_payment_entry checks permissions internally
+		current_user = frappe.session.user
+		frappe.set_user("Administrator")
+		try:
+			pe = get_payment_entry("Sales Order", so.name)
 
-		# Override with Mamo Pay configured account
-		pe.paid_to = settings.default_payment_account
-		pe.paid_to_account_currency = frappe.db.get_value(
-			"Account", settings.default_payment_account, "account_currency"
-		)
+			# Override with Mamo Pay configured account
+			pe.paid_to = settings.default_payment_account
+			pe.paid_to_account_currency = frappe.db.get_value(
+				"Account", settings.default_payment_account, "account_currency"
+			)
 
-		# Set reference for traceability and duplicate detection
-		pe.reference_no = self.name
-		pe.reference_date = frappe.utils.nowdate()
+			# Set reference for traceability and duplicate detection
+			pe.reference_no = self.name
+			pe.reference_date = frappe.utils.nowdate()
 
-		# Add Mamo Pay processing fee deduction
-		deduction_amount = (
-			(so.grand_total * (settings.mamo_charge_percent or 0) / 100)
-			+ (settings.mamo_charge_amount or 0)
-		)
-		if deduction_amount > 0 and settings.default_deduction_account:
-			pe.append("deductions", {
-				"account": settings.default_deduction_account,
-				"cost_center": so.get("cost_center") or frappe.get_cached_value(
-					"Company", so.company, "cost_center"
-				),
-				"amount": deduction_amount,
-				"description": "Mamo Pay processing fee",
-			})
+			# Add Mamo Pay processing fee deduction
+			deduction_amount = (
+				(so.grand_total * (settings.mamo_charge_percent or 0) / 100)
+				+ (settings.mamo_charge_amount or 0)
+			)
+			if deduction_amount > 0 and settings.default_deduction_account:
+				pe.append("deductions", {
+					"account": settings.default_deduction_account,
+					"cost_center": so.get("cost_center") or frappe.get_cached_value(
+						"Company", so.company, "cost_center"
+					),
+					"amount": deduction_amount,
+					"description": "Mamo Pay processing fee",
+				})
 
-		pe.flags.ignore_permissions = True
-		pe.insert()
-		pe.submit()
+			pe.flags.ignore_permissions = True
+			pe.insert()
+			pe.submit()
+		finally:
+			frappe.set_user(current_user)

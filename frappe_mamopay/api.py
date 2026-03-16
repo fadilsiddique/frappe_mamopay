@@ -202,6 +202,11 @@ def webhook():
 	event_type = payload.get("event_type") or payload.get("type", "")
 	charge_data = payload.get("data", payload)
 
+	# Only process charge-related events that we handle
+	from frappe_mamopay.frappe_mamopay.doctype.mamo_pay_payment.mamo_pay_payment import EVENT_STATUS_MAP
+	if event_type not in EVENT_STATUS_MAP:
+		return {"status": "ok"}
+
 	# Find the corresponding Mamo Pay Payment
 	payment_link_id = charge_data.get("payment_link_id") or charge_data.get("paymentLinkId")
 	external_id = charge_data.get("external_id")
