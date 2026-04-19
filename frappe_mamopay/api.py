@@ -8,9 +8,9 @@ from frappe_mamopay.mamopay_client import MamoPayClient
 MAX_CUSTOM_DATA_SIZE = 10240  # 10 KB
 
 
-def _check_mamopay_role():
-	"""Ensure current user has System Manager role for Mamo Pay operations."""
-	if not frappe.has_permission("Mamo Pay Payment", ptype="write"):
+def _check_mamopay_role(ptype="write"):
+	"""Check user has the required permission on Mamo Pay Payment."""
+	if not frappe.has_permission("Mamo Pay Payment", ptype=ptype):
 		frappe.throw("Insufficient permissions for Mamo Pay operations.", frappe.PermissionError)
 
 
@@ -29,7 +29,7 @@ def create_payment_link(
 	custom_data=None,
 ):
 	"""Create a Mamo Pay payment link and log it as a Mamo Pay Payment record."""
-	_check_mamopay_role()
+	_check_mamopay_role(ptype="create")
 
 	settings = frappe.get_single("Mamo Pay Settings")
 	if not settings.enabled:
