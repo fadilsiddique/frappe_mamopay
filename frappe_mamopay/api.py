@@ -14,6 +14,34 @@ def _check_mamopay_role(ptype="write"):
 		frappe.throw("Insufficient permissions for Mamo Pay operations.", frappe.PermissionError)
 
 
+def _verify_amount_against_reference(amount, reference_doctype, reference_name):
+	"""
+	Opt-in amount check. If the reference doc defines get_payment_amount(),
+	the supplied amount must match within 0.01 tolerance.
+	Silently skips if the method is not defined.
+	"""
+	if not reference_doctype or not reference_name:
+		return
+	try:
+		ref_doc = frappe.get_doc(reference_doctype, reference_name)
+	except frappe.DoesNotExistError:
+		frappe.throw(f"{reference_doctype} {reference_name} not found.")
+	if not hasattr(ref_doc, "get_payment_amount"):
+		return
+	try:
+		expected = float(ref_doc.get_payment_amount())
+	except (TypeError, ValueError):
+		frappe.log_error(
+			title=f"Mamo Pay: get_payment_amount() returned non-numeric for {reference_doctype} {reference_name}",
+		)
+		frappe.throw("Could not determine expected payment amount from reference document.")
+	if abs(amount - expected) > 0.01:
+		frappe.throw(
+			f"Amount mismatch: supplied {amount}, expected {expected} "
+			f"from {reference_doctype} {reference_name}."
+		)
+
+
 @frappe.whitelist()
 def create_payment_link(
 	title,
@@ -52,6 +80,10 @@ def create_payment_link(
 	for url_val in [return_url, failure_return_url]:
 		if url_val and not url_val.startswith(("https://", "http://")):
 			frappe.throw("Return URL must start with https:// or http://")
+
+	# Verify amount server-side against the reference document
+	if reference_doctype and reference_name:
+		_verify_amount_against_reference(amount, reference_doctype, reference_name)
 
 	# Build params for Mamo Pay API
 	params = {
