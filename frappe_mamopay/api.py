@@ -92,7 +92,9 @@ def create_payment_link(
 		"amount_currency": amount_currency or settings.default_currency,
 		"return_url": return_url or settings.return_url,
 		"failure_return_url": failure_return_url or settings.failure_return_url,
-		"enable_customer_details": True,
+		"enable_customer_details": False,          # <-- was True; this was causing the extra step
+		"payment_methods": ["card", "wallet"],     # card + Apple Pay / Google Pay
+		"save_card": "optional",                   # or "required" / "off"         # optional, nice-to-have
 	}
 
 	if description:
@@ -102,7 +104,6 @@ def create_payment_link(
 		params["email"] = customer_email
 
 	if customer_name:
-		# Split name into first/last for Mamo Pay
 		name_parts = customer_name.strip().split(" ", 1)
 		params["first_name"] = name_parts[0]
 		if len(name_parts) > 1:
