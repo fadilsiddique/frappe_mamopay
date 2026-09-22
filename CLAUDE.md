@@ -58,6 +58,10 @@ Create Link → Payment → Webhook/Verify → Update Status → Hook on Referen
 | `charge.refund_initiated`| Refund Initiated |
 | `charge.refund_failed`   | Captured         |
 
+### Captured Amount
+
+`Mamo Pay Payment.captured_amount` records the amount on the charge Mamo Pay reports (webhook payload, or the charge fetched by `verify_payment`), as distinct from `amount`, which is what the link was created for. Callers that post accounting against a payment reconcile against `captured_amount`. Written by `MamoPayPayment.absorb_charge()`, which both the webhook and verify paths go through.
+
 ### Sales Order Integration
 
 When `reference_doctype` is "Sales Order":

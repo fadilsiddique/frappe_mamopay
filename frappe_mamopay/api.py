@@ -183,8 +183,8 @@ def verify_payment(payment_link_id, transaction_id=None):
 		else:
 			new_status = payment.status
 
+		payment.absorb_charge(charge_data)
 		payment.transaction_id = transaction_id
-		payment.mamo_response = json.dumps(charge_data, indent=2)
 	else:
 		new_status = payment.status
 
@@ -194,6 +194,10 @@ def verify_payment(payment_link_id, transaction_id=None):
 
 		# Call hook on reference document
 		payment._call_payment_hook()
+	elif charge_data:
+		# Keep the charge details even when the status did not move, or a caller
+		# settling against this payment has no captured amount to reconcile with.
+		payment.save(ignore_permissions=True)
 
 	return {
 		"name": payment.name,

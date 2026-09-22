@@ -2,6 +2,7 @@ import json
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import flt
 
 EVENT_STATUS_MAP = {
 	"charge.succeeded": "Captured",
@@ -18,6 +19,26 @@ class MamoPayPayment(Document):
 		if not self.external_id:
 			self.external_id = self.name
 
+	def absorb_charge(self, payload):
+		"""Copy identifiers and the charged amount out of a Mamo Pay charge object.
+
+		``captured_amount`` is what Mamo Pay says it took, as opposed to ``amount``,
+		which is what was asked for when the link was created. A caller settling
+		accounts against this payment must reconcile against the money received.
+		"""
+		if not isinstance(payload, dict):
+			return
+
+		charge_id = payload.get("id") or payload.get("charge_id")
+		if charge_id:
+			self.transaction_id = charge_id
+
+		amount = payload.get("amount")
+		if amount is not None:
+			self.captured_amount = flt(amount)
+
+		self.mamo_response = json.dumps(payload, indent=2)
+
 	def update_from_webhook(self, event_type, payload):
 		"""Update payment status from a webhook event."""
 		new_status = EVENT_STATUS_MAP.get(event_type)
@@ -29,12 +50,7 @@ class MamoPayPayment(Document):
 			return
 
 		self.status = new_status
-		self.mamo_response = json.dumps(payload, indent=2)
-
-		# Extract transaction ID from payload if available
-		charge_id = payload.get("id") or payload.get("charge_id")
-		if charge_id:
-			self.transaction_id = charge_id
+		self.absorb_charge(payload)
 
 		self.save(ignore_permissions=True)
 

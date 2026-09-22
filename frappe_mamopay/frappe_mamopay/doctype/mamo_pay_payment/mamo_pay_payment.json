@@ -16,6 +16,7 @@
   "description",
   "section_transaction",
   "transaction_id",
+  "captured_amount",
   "external_id",
   "column_break_transaction",
   "reference_doctype",
@@ -98,6 +99,13 @@
    "fieldname": "transaction_id",
    "fieldtype": "Data",
    "label": "Transaction ID",
+   "read_only": 1
+  },
+  {
+   "description": "Amount Mamo Pay reports on the charge, in the payment currency",
+   "fieldname": "captured_amount",
+   "fieldtype": "Currency",
+   "label": "Captured Amount",
    "read_only": 1
   },
   {
